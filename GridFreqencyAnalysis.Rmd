@@ -1,22 +1,35 @@
 ---
 title: "Grid Frequency Analysis"
 author: "Michael Bülow Pedersen"
-# date: "18 October 2015"
 output: pdf_document
 ---
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## Research Objects
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+1. Download data from API and Web.
+2. Store and handle a large dataset of $`r format(365*24*60*60+1,scientific=FALSE,big.mark = ",")`$ observations per year.
+3. Create beautiful, informative graphs.
+4. Produce reproducable research.
+5. Make a shiny/rStudio presentation showing results.
+6. Answer research questions:
+    + is the frequency exactly 50 Hz on average?
+    + what differences in frequency quality can be observed between the Nordic and Continental electricity grids?
+    
 
-```{r}
-summary(cars)
-```
+## Introduction
 
-You can also embed plots, for example:
+The European electricity grid consists of several distinct frequency areas. One frequency area is the Nordic grid which covers Norway, Finland, Sweden and Eastern Denmark. Another frequency area is the Continental grid which covers countries such as Germany, France, Spain, Portugal, Italy, Slovenia, Czech Republic, Switzerland, Slovkia, Poland, and all the way to the border of Turkey...
 
-```{r, echo=FALSE}
-plot(cars)
-```
+To keep a power grid stable, it is necessary for the grid frequency to move within a narrow band around a predetermind value. 
+For European countries the grid frequency has been set at 50 Hz. Whenever the frequency moves below this level, Transmission System Operators have contracted grid connected market participants to supply power to the grid at seconds notice. Similarly, if the frequency moves above 50 Hz TSO's have contracted participants to withdraw power from the grid.
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Interestingly, it has also been agreed to run the power system at exactly 50 Hz on average. Because accumulated short-term frequency deviations can move the average above 50 Hz on one day, it is necessary to correct the grid frequency by setting a lower frequency point on subsequent days. We should therefore be able to observe autoregressive effects in the daily average frequency measurements.
+Because of this correction, it should be possible to set a watch by measuring the grid frequency (give or take about a minute). 
+We will test whether the information in this paragraph is indeed correct.
+
+## Getting the data
+
+To get frequency measurements in the Nordic grid, we can query the API of the [Norwegian TSO Statnett](http://www.statnett.no/en/Market-and-operations/). 
+
+To get frequency measurements in the Continental grid, we can query the Website of the [French TSO RTE](http://clients.rte-france.com/lang/an/clients_producteurs/vie/vie_frequence.jsp). 
+
