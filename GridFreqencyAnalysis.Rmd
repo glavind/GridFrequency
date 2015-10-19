@@ -8,10 +8,11 @@ output: pdf_document
 
 1. Download data from API and Web.
 2. Store and handle a large dataset of $`r format(365*24*60*60+1,scientific=FALSE,big.mark = ",")`$ observations per year.
-3. Create beautiful, informative graphs.
-4. Produce reproducable research.
-5. Make a shiny/rStudio presentation showing results.
-6. Answer research questions:
+3. Handle timeseries data that cross daylight savings.
+4. Create beautiful, informative graphs.
+5. Produce reproducable research.
+6. Make a shiny/rStudio presentation showing results.
+7. Answer research questions:
     + is the frequency exactly 50 Hz on average?
     + what differences in frequency quality can be observed between the Nordic and Continental electricity grids?
     
@@ -33,7 +34,63 @@ We will test whether the information in this paragraph is indeed correct.
 
 We can query the API of the [Norwegian TSO Statnett](http://www.statnett.no/en/Market-and-operations/) to get 1 second measurements. This gives $`r format(365*24*60*60,scientific=FALSE,big.mark = ",")`$ observations per year.
 
+The call to the API is http://driftsdata.statnett.no/restapi/Frequency/BySecond?FromInTicks=FromTimeInMs&ToInTicks=ToTimeInMs. The GET request returns 1 second measurements as well as startDate and EndDate of the request in Local timezone. The inputs are ms since epoch and therefore UTC.
+
+Data retrieval is somewhat complicated by the fact that the return data does not have datetimes associated with each observation. This becomes a problem because there are missing observations. This happens for instance on 2015-01-07 15:33:00 to 15:34:00 (both seconds included). We are therefore forced to download an hour, check if it is complete. If not, get each minute and check if complete. If not, get each second and check if complete or finally NA.
+
+The API only returns 1 hour of data (probably `r 60*60` observations). So,
+```{r eval=F}
+fromDate <- ymd_hms("2015-10-19 07:00:00")
+toDate <- ymd_hms("2015-10-19 08:00:00")
+```
+gives data from "2015-10-19 09:00:00" to "2015-10-19 09:59:59"
+
+### API Examples
+
+The following examples illustrates how DST affects output
+
+Before DST:
+```{r eval=F}
+fromDate <- dmy_hms("28-03-2015 12:00:00")
+toDate <- dmy_hms("28-03-2015 13:00:00")
+```
+> "2015-03-28 13:00:00"  
+> "2015-03-28 13:59:59"
+
+After DST:
+```{r eval=F}
+fromDate <- dmy_hms("29-03-2015 12:00:00")
+toDate <- dmy_hms("29-03-2015 13:00:00")
+```
+> "2015-03-29 14:00:00"  
+> "2015-03-29 14:59:59"
+
+Under DST (02:00-03:00 local time / 01:00-02:00 UTC does not exist):
+```{r eval=F}
+fromDate <- dmy_hms("29-03-2015 00:00:00")
+toDate <- dmy_hms("29-03-2015 01:00:00")
+```
+> "2015-03-29 01:00:00"  
+> "2015-03-29 01:59:59"
+
+```{r eval=F}
+fromDate <- dmy_hms("29-03-2015 00:30:00")
+toDate <- dmy_hms("29-03-2015 01:30:00")
+```
+> "2015-03-29 01:30:00"  
+> "2015-03-29 03:29:59"
+
+```{r eval=F}
+fromDate <- dmy_hms("29-03-2015 01:00:00")
+toDate <- dmy_hms("29-03-2015 02:00:00")
+```
+> "2015-03-29 03:00:00"  
+> "2015-03-29 03:59:59"
+
+
+
 ### Continental
 
-We can query the Website of the [French TSO RTE](http://clients.rte-france.com/lang/an/clients_producteurs/vie/vie_frequence.jsp) to get 10 second measuremetns. This gives $`r format(365*24*60*60/10,scientific=FALSE,big.mark = ",")`$ observations per year.
+We can query the Website of the [French TSO RTE](http://clients.rte-france.com/lang/an/clients_producteurs/vie/vie_frequence.jsp) to get 10 second measurements. This gives $`r format(365*24*60*60/10,scientific=FALSE,big.mark = ",")`$ observations per year.
 
+The data is returned as a monthly zip file containing one csv file with 10 second measurements in Hz. The format of the date is currently unknown (UTC vs. Europe/Paris)
