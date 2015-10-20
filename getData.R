@@ -60,13 +60,17 @@ setwd("C:/Users/Glavind/git/GridFrequency")
   library(pryr) # report file size
   if(!file.exists("data/nordic")){dir.create("data/nordic",recursive = T)}
   
-  fromUTC <- dmy_hms("07-01-2015 15:00:00")
-  toUTC <- dmy_hms("07-01-2015 16:00:00")
   
   freq_nordic <- data.frame()
+  #freq_nordic <- readRDS("freq_nordic.rds") # Load
+
+  fromUTC <- dmy_hms("01-01-2015 00:00:00")
+  toUTC <- dmy_hms("01-10-2015 20:00:00")
+  
   date.start <- Sys.time()
   
   for (loopHour in seq(fromUTC, toUTC, by=3600)){ # Loop over each hour
+    timer<- Sys.time()
     #loopHour <- dmy_hms("07-01-2015 15:00:00")
     
     restURL <- paste0("http://driftsdata.statnett.no/restapi/Frequency/BySecond?",
@@ -102,7 +106,7 @@ setwd("C:/Users/Glavind/git/GridFrequency")
                                "frequency"=unlist(parsedData$Measurements))
           freq_nordic <- rbind(freq_nordic,result)
         } else { # loop across seconds in minute
-          #warning("missing observations in minute: ", as.POSIXct(loopMinute, origin = "1970-01-01",tz="UTC"))
+          warning("missing observations in minute: ", as.POSIXct(loopMinute, origin = "1970-01-01",tz="UTC"))
           
           for (loopSecond in seq(loopMinute, loopMinute + 60, by=1)){ # Loop over each second
             #loopSecond <- dmy_hms("07-01-2015 15:30:40")
@@ -117,11 +121,11 @@ setwd("C:/Users/Glavind/git/GridFrequency")
             if(length(parsedData$Measurements)==1){ # Observation present in second, write result
               startPointLocal <- strptime(parsedData$StartPointUTC/1000, '%s', tz="Europe/Paris")
               endPointLocal <- strptime(parsedData$EndPointUTC/1000, '%s', tz="Europe/Paris")
-              result <- data.frame("date"=as.POSIXct(seq(loopSecond, loopSecond, by=1),origin = "1970-01-01",tz="UTC"),
+              result <- data.frame("date"=as.POSIXct(loopSecond, origin = "1970-01-01", tz="UTC"),
                                    "frequency"=unlist(parsedData$Measurements))
             } else { # If no observation then write NA
-              warning("missing observation in second: ",as.POSIXct(loopSecond, origin = "1970-01-01",tz="UTC"))
-              result <- data.frame("date"=as.POSIXct(seq(loopSecond, loopSecond, by=1),origin = "1970-01-01",tz="UTC"),
+              #warning("missing observation in second: ",as.POSIXct(loopSecond, origin = "1970-01-01",tz="UTC"))
+              result <- data.frame("date"=as.POSIXct(loopSecond, origin = "1970-01-01", tz="UTC"),
                                    "frequency"=NA)
             }
             freq_nordic <- rbind(freq_nordic, result)
@@ -129,15 +133,48 @@ setwd("C:/Users/Glavind/git/GridFrequency")
         }
       }
     }
+    cat("\n", "Hour: ", format(as.POSIXct(loopHour, origin = "1970-01-01",tz="UTC"),"%Y-%m-%d %H:%M:%S")," (", as.numeric(Sys.time() - timer, units='secs'), " seconds)",sep="")
   }
-  print("Runtime"); Sys.time() - date.start
+  cat("\n", "Total Runtime: ", as.numeric(Sys.time() - date.start, units='mins'), " minutes",sep="")
   
-  str(freq_nordic)
+  
+  head(freq_nordic)
+  tail(freq_nordic)
   object_size(freq_nordic) # Report size
-  saveRDS(freq_nordic, "freq_nordic.rds") # Save
+  saveRDS(freq_nordic, "freq_nordic_2015-9.rds") # Save
   #freq_nordic <- readRDS("freq_nordic.rds") # Load
+  #test<-freq_nordic[freq_nordic[,1]>=dmy("01-08-2015")&freq_nordic[,1]<dmy("01-09-2015"),]
   
-  aDate <- parsedData$StartPointUTC/1000
-  aDate <- parsedData$EndPointUTC/1000
-  as.POSIXct(aDate, origin = "1970-01-01",tz="UTC")
+#   aDate <- parsedData$StartPointUTC/1000
+#   aDate <- parsedData$EndPointUTC/1000
+#   as.POSIXct(aDate, origin = "1970-01-01",tz="UTC")
   
+  r1<-unique(readRDS("freq_nordic_2015-1.rds"))
+  r2<-unique(readRDS("freq_nordic_2015-2.rds"))
+  r3<-unique(readRDS("freq_nordic_2015-3.rds"))
+  r4<-unique(readRDS("freq_nordic_2015-4.rds"))
+  r5<-unique(readRDS("freq_nordic_2015-5.rds"))
+  r6<-unique(readRDS("freq_nordic_2015-6.rds"))
+  r7<-unique(readRDS("freq_nordic_2015-7.rds"))
+  r8<-unique(readRDS("freq_nordic_2015-8.rds"))
+  r9<-unique(readRDS("freq_nordic_2015-9.rds"))
+  
+  r <- rbind(r1,r2,r3,r4,r5,r6,r7,r8,r9)
+  saveRDS(r, "freq_nordic.rds") # Save
+  
+  ## Test if number of observations are correct:
+#   d <- difftime(dmy_hms("1-10-2015 00:00:00"), dmy_hms("1-1-2015 00:00:00"), units="sec")
+#   d
+#   nrow(r)
+#   f<-nrow(r)-as.integer(d)
+#   f
+#   f/3600/24
+  mem_used()
+  
+  library(data.table)
+  dt<-data.table(r)
+  saveRDS(dt,"freq_nordic_dt_1-9.rds")
+  
+################
+### ANALYSIS ###
+################

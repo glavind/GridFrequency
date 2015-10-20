@@ -38,6 +38,8 @@ The call to the API is http://driftsdata.statnett.no/restapi/Frequency/BySecond?
 
 Data retrieval is somewhat complicated by the fact that the return data does not have datetimes associated with each observation. This becomes a problem because there are missing observations. This happens for instance on 2015-01-07 15:33:00 to 15:34:00 (both seconds included). We are therefore forced to download an hour, check if it is complete. If not, get each minute and check if complete. If not, get each second and check if complete or finally NA.
 
+The current implementation sometimes result in duplicate observations being added to the data frame. I cannot figure out where duplication occurs, so for now duplicate values are just excluded afterwards using the unique() function. 
+
 The API only returns 1 hour of data (probably `r 60*60` observations). So,
 ```{r eval=F}
 fromDate <- ymd_hms("2015-10-19 07:00:00")
@@ -88,9 +90,8 @@ toDate <- dmy_hms("29-03-2015 02:00:00")
 > "2015-03-29 03:59:59"
 
 
-
 ### Continental
 
 We can query the Website of the [French TSO RTE](http://clients.rte-france.com/lang/an/clients_producteurs/vie/vie_frequence.jsp) to get 10 second measurements. This gives $`r format(365*24*60*60/10,scientific=FALSE,big.mark = ",")`$ observations per year.
 
-The data is returned as a monthly zip file containing one csv file with 10 second measurements in Hz. The format of the date is currently unknown (UTC vs. Europe/Paris)
+The data is returned as a monthly zip file containing one csv file with 10 second measurements in Hz. The format of the date is local time (Europe/Paris), with NA for hour 3 (02:00:00-02:59:50) in spring DST and presumably removal of one hour in the autumn DST.
