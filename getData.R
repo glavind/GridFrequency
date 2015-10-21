@@ -61,14 +61,16 @@ setwd("C:/Users/Glavind/git/GridFrequency")
   if(!file.exists("data/nordic")){dir.create("data/nordic",recursive = T)}
   
   
-  freq_nordic <- data.frame()
-  #freq_nordic <- readRDS("freq_nordic.rds") # Load
+  freq_nordic <- data.frame() # Start with empty data frame
+  #freq_nordic <- readRDS("freq_nordic.rds") # Start with loaded data frame
 
+  ## Get from/to as hour, both dates are included
   fromUTC <- dmy_hms("01-01-2015 00:00:00")
   toUTC <- dmy_hms("01-10-2015 20:00:00")
   
-  date.start <- Sys.time()
+  date.start <- Sys.time() # Save starttime
   
+  ## Main loop
   for (loopHour in seq(fromUTC, toUTC, by=3600)){ # Loop over each hour
     timer<- Sys.time()
     #loopHour <- dmy_hms("07-01-2015 15:00:00")
@@ -137,18 +139,22 @@ setwd("C:/Users/Glavind/git/GridFrequency")
   }
   cat("\n", "Total Runtime: ", as.numeric(Sys.time() - date.start, units='mins'), " minutes",sep="")
   
-  
+  ## Diagnostics
   head(freq_nordic)
   tail(freq_nordic)
   object_size(freq_nordic) # Report size
-  saveRDS(freq_nordic, "freq_nordic.rds") # Save
-  #freq_nordic <- readRDS("freq_nordic.rds") # Load
-  #test<-freq_nordic[freq_nordic[,1]>=dmy("01-08-2015")&freq_nordic[,1]<dmy("01-09-2015"),]
   
-#   aDate <- parsedData$StartPointUTC/1000
-#   aDate <- parsedData$EndPointUTC/1000
-#   as.POSIXct(aDate, origin = "1970-01-01",tz="UTC")
-#   
+  ## Save
+  saveRDS(freq_nordic, "freq_nordic.rds") # Save
+  
+  ## Load
+  #freq_nordic <- readRDS("freq_nordic.rds") # Load
+  
+  ## Subset
+  #test<-freq_nordic[freq_nordic[,1]>=dmy("01-08-2015")&freq_nordic[,1]<dmy("01-09-2015"),]
+
+  
+  ## Read all months that where previously saved to disc   
 #   r1<-unique(readRDS("freq_nordic_2015-1.rds"))
 #   r2<-unique(readRDS("freq_nordic_2015-2.rds"))
 #   r3<-unique(readRDS("freq_nordic_2015-3.rds"))
@@ -171,10 +177,6 @@ setwd("C:/Users/Glavind/git/GridFrequency")
 #   f/3600/24
   mem_used()
   
-  library(data.table)
+  ## Save to data table
   dt<-data.table(r)
   saveRDS(dt,"freq_nordic_dt_1-9.rds")
-  
-################
-### ANALYSIS ###
-################
