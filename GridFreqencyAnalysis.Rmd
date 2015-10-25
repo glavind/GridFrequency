@@ -39,6 +39,7 @@ If data sources and data retrieval is not of interest, you may proceed to the ac
 For the Continental grid we have an observation for each 10 seconds leading to $`r format(as.double(difftime(as.POSIXct("2015-09-01"), as.POSIXct("2015-01-01"), units="sec"))/10,scientific=FALSE,big.mark = ",")`$ observations. 
 For the Nordic grid we have an observations each second leading to $`r format(as.double(difftime(as.POSIXct("2015-09-01"), as.POSIXct("2015-01-01"), units="sec")),scientific=FALSE,big.mark = ",")`$ observations.
 
+In the sample period there was a summer Daylight Savings Time (DST) change in Hour 3 on 2015-03-29, where the hour does not exist in local time. Similarly there will be a winter DST change in Hour 3 on 2015-10-25 (not included in sample), where there will be two hours.
 
 ### Nordic
 
@@ -105,7 +106,9 @@ toDate <- dmy_hms("29-03-2015 02:00:00")
 
 We can query the Website of the [French TSO RTE](http://clients.rte-france.com/lang/an/clients_producteurs/vie/vie_frequence.jsp) to get 10 second measurements ($`r format(365*24*60*60/10,scientific=FALSE,big.mark = ",")`$ observations per year).
 
-The data returned is a zip file containing one csv file with 10 second measurements for one month in Hz. The format of the date is local time (Europe/Paris), with NA for hour 3 (02:00:00-02:59:50) in spring DST and presumably removal of hour 3 at the autumn DST.
+The data returned is a zip file containing one csv file with 10 second measurements for one month in Hz. The format of the date is local time (Europe/Paris), with NA for hour 3 (02:00:00-02:59:50) in spring DST.
+
+There are also a number of missing values in this data set.
 
 # Analysis
 

@@ -1,14 +1,18 @@
 library(lubridate) # convert date
+library(httr)
 library(pryr) # report file size
+#library(data.table)
+library(xts)
 
 setwd("C:/Users/Glavind/git/GridFrequency")
+#Sys.setenv(TZ="Europe/Paris") # Optional: Set Global R timezone to continental
 
 ##########################################
 ### Continental frequency measurements ###
 ##########################################
 
-  if(!file.exists("data/continental/zip")){dir.create("data/continental/zip",recursive = T)}
-  if(!file.exists("data/continental/csv")){dir.create("data/continental/csv",recursive = T)}
+  if(!file.exists("data/continental/zip")){dir.create("data/continental/zip", recursive = T)}
+  if(!file.exists("data/continental/csv")){dir.create("data/continental/csv", recursive = T)}
   
   ## Download files from RTE. A backlog of one year is available.
   getYear <- 2015 # Set year
@@ -28,45 +32,47 @@ setwd("C:/Users/Glavind/git/GridFrequency")
     unzip(zipfile=paste0("./data/continental/zip/", zipFile), exdir="data/continental/csv")
   }
 
+###########################
+### Collect in one file ###
+###########################
+  
   ## Read files
-  freq <- data.frame()
+  xFC <- data.frame()
   csvFiles <- dir(path="data/continental/csv", full.names = T) # Find all files in directory
   csvFiles <- grep(csvFiles, pattern = ".csv", value = T) # restrict to csv
+  csvFiles <- grep(csvFiles, pattern = "2015_0[0-9]", value = T) # restrict to month 1-9
   
-  ## Combine files in dataframe
+  ## Combine csv-files in one df
   for (csvFile in csvFiles){
-    f <- readLines(csvFile)
-    f.read <- read.table(file=csvFile, sep = ";", dec = ",", header = T, skip = 1, nrows = length(f)-3); f <- NULL
-    names(f.read)<-c("date","frequency","X")
+    f <- readLines(csvFile) # Find number of lines
+    f.read <- read.table(file=csvFile, na.strings=c("N/A"), sep = ";", dec = ",", header = F, skip = 2, nrows = length(f)-3) #Exclude first two and last line
+    f <- NULL; f.read$V3<- NULL #Drop orphan column
     
-    f.read$X<- NULL #Drop orphan column
-    f.read$date <- dmy_hms(f.read$date) # convert to date
-    freq <- rbind(freq, f.read)
+    names(f.read)<-c("date","frequency")
+    f.read$date <- as.POSIXct(f.read$date, format="%d/%m/%Y %H:%M:%S", tz="Europe/Paris") # convert to date
+    xFC <- rbind(xFC, f.read)
   }
   
-  attr(freq,"downloaded.on") <- dateDownloaded
+  freq_continental <- xts(xFC[,2],xFC[,1]) # Save as xts
+  names(freq_continental) <- c("frequency")
+  attr(freq_continental,"downloaded.on") <- file.mtime(csvFiles[1]) # Save download time
   
-  head(freq)
-  tail(freq) 
-  object_size(freq) # Report size
-  saveRDS(freq,"continental.rds") # Save
-  #freq <- readRDS("continental.rds") # Load
+  saveRDS(freq_continental,"data/freq_continental_raw.rds") # Save
+  
+  rm(xFC, freq_continental, csvFile, f, csvFiles, f.read)
   
 #####################################
 ### Nordic frequency measurements ###
 #####################################
-  library(httr)
-  library(lubridate)
-  library(pryr) # report file size
-  if(!file.exists("data/nordic")){dir.create("data/nordic",recursive = T)}
   
+  if(!file.exists("data/nordic")){dir.create("data/nordic",recursive = T)}
   
   freq_nordic <- data.frame() # Start with empty data frame
   #freq_nordic <- readRDS("freq_nordic.rds") # Start with loaded data frame
 
   ## Get from/to as hour, both dates are included
-  fromUTC <- dmy_hms("01-01-2015 00:00:00")
-  toUTC <- dmy_hms("01-10-2015 20:00:00")
+  fromUTC <- dmy_hms("31-12-2014 00:00:00")
+  toUTC <- dmy_hms("31-12-2014 23:00:00")
   
   date.start <- Sys.time() # Save starttime
   
@@ -145,38 +151,134 @@ setwd("C:/Users/Glavind/git/GridFrequency")
   object_size(freq_nordic) # Report size
   
   ## Save
-  saveRDS(freq_nordic, "freq_nordic.rds") # Save
+  saveRDS(freq_nordic, "data/nordic/freq_nordic_xxx.rds") # Save
   
-  ## Load
-  #freq_nordic <- readRDS("freq_nordic.rds") # Load
-  
-  ## Subset
-  #test<-freq_nordic[freq_nordic[,1]>=dmy("01-08-2015")&freq_nordic[,1]<dmy("01-09-2015"),]
-
-  
+###########################
+### Collect in one file ###
+###########################
   ## Read all months that where previously saved to disc   
-#   r1<-unique(readRDS("freq_nordic_2015-1.rds"))
-#   r2<-unique(readRDS("freq_nordic_2015-2.rds"))
-#   r3<-unique(readRDS("freq_nordic_2015-3.rds"))
-#   r4<-unique(readRDS("freq_nordic_2015-4.rds"))
-#   r5<-unique(readRDS("freq_nordic_2015-5.rds"))
-#   r6<-unique(readRDS("freq_nordic_2015-6.rds"))
-#   r7<-unique(readRDS("freq_nordic_2015-7.rds"))
-#   r8<-unique(readRDS("freq_nordic_2015-8.rds"))
-#   r9<-unique(readRDS("freq_nordic_2015-9.rds"))
-#   
-#   r <- rbind(r1,r2,r3,r4,r5,r6,r7,r8,r9)
-#   saveRDS(r, "freq_nordic.rds") # Save
-#   
-  ## Test if number of observations are correct:
-#   d <- difftime(dmy_hms("1-10-2015 00:00:00"), dmy_hms("1-1-2015 00:00:00"), units="sec")
-#   d
-#   nrow(r)
-#   f<-nrow(r)-as.integer(d)
-#   f
-#   f/3600/24
-  mem_used()
+  r0<-unique(readRDS("data/nordic/freq_nordic_2014-12-31.rds"))
+  r1<-unique(readRDS("data/nordic/freq_nordic_2015-1.rds"))
+  r2<-unique(readRDS("data/nordic/freq_nordic_2015-2.rds"))
+  r3<-unique(readRDS("data/nordic/freq_nordic_2015-3.rds"))
+  r4<-unique(readRDS("data/nordic/freq_nordic_2015-4.rds"))
+  r5<-unique(readRDS("data/nordic/freq_nordic_2015-5.rds"))
+  r6<-unique(readRDS("data/nordic/freq_nordic_2015-6.rds"))
+  r7<-unique(readRDS("data/nordic/freq_nordic_2015-7.rds"))
+  r8<-unique(readRDS("data/nordic/freq_nordic_2015-8.rds"))
+  r9<-unique(readRDS("data/nordic/freq_nordic_2015-9.rds"))
+   
+  r <- rbind(r0, r1,r2,r3,r4,r5,r6,r7,r8,r9) # collect in df
+  rm(r0, r1,r2,r3,r4,r5,r6,r7,r8,r9)
   
-  ## Save to data table
-  dt<-data.table(r)
-  saveRDS(dt,"freq_nordic_dt_1-9.rds")
+  xFN <- xts(r[,2], r[,1], tz="Europe/Paris") # collect in XTS
+  names(xFN) <- c("frequency")
+  saveRDS(xFN, "data/freq_nordic_raw.rds") # Save unprocessed XTS to disc
+  rm(r, xFN)
+  
+####################
+### Process Data ###
+####################
+  
+## Load Nordic data, subset and validate
+  FN <- readRDS("data/freq_nordic_raw.rds") # Load raw observations file
+  FN <- FN['2015-01-01::2015-09-30 23:59:59'] # Subset
+  # Check number of observations are correct
+  FNDates<-seq(ymd("2015-01-01",tz="Europe/Paris"), ymd_hms("2015-09-30 23:59:59",tz="Europe/Paris"), by = 1)
+  assertthat::are_equal(nrow(FN),length(FNDates))  # Check length
+  
+  saveRDS(FN, "data/freq_nordic_processed.rds") # Save processed XTS to disc
+  rm(FN, FNDates)
+  
+## Load Continental data, subset and validate
+  FC <- readRDS("data/freq_continental_raw.rds") # Load
+  # Print number of observations with NA in index, and then remove them
+  cat("Removing", sum(is.na(index(FC))), "observations with missing index") 
+  FC <- FC[!is.na(index(FC))] # Remove observations with NA in index, these stem from DST.
+  # Subset
+  FC <- FC['2015-01-01::2015-09-30 23:59:59']
+  
+  ## Handle missing observations
+  FCDates<-seq(ymd("2015-01-01",tz="Europe/Paris"), ymd_hms("2015-09-30 23:59:50",tz="Europe/Paris"), by = 10)
+  FCIndex<-xts(NULL,order.by = FCDates) #create empty xts with all dates
+  #missObs <- FCDates[!(FCDates %in% index(FC))] # Find missing observations
+  
+  FC<-cbind(FCIndex,FC) # Populate with observations
+  assertthat::are_equal(nrow(FC),length(FCDates)) # Check length
+  
+  saveRDS(FC, "data/freq_continental_processed.rds") # Save processed XTS to disc
+  rm(FC, FCDates, FCIndex)
+  
+###########################  
+### Aggregate to minute ###
+###########################
+  ## Read data
+  # Read raw 1/10 second data
+  FN <- readRDS("data/freq_nordic_processed.rds") # XTS
+  FC <- readRDS("data/freq_continental_processed.rds") # XTS
+  
+  my.max <- function(x) ifelse( !all(is.na(x)), max(x, na.rm=T), NA)
+  my.min <- function(x) ifelse( !all(is.na(x)), min(x, na.rm=T), NA)
+  
+  #############################
+  ## Processed to 1 min data ##
+  #############################
+  # Continental:
+  V1 <- aggregate(FC, cut(index(FC), breaks="min"), mean, na.rm = TRUE) # Mean, digress to zoo
+  V2 <- aggregate(FC, cut(index(FC), breaks="min"), my.max) # Max
+  V3 <- aggregate(FC, cut(index(FC), breaks="min"), my.min) # Min
+  V4 <- aggregate(FC, cut(index(FC), breaks="min"), sd, na.rm = TRUE) # Standard Deviation
+  mFC <- xts(x=cbind(coredata(V1),coredata(V2),coredata(V3),coredata(V4)),
+             order.by=as.POSIXct(index(V1),tz="Europe/Paris"))
+  colnames(mFC)<-c("mean", "max", "min","std.dev")
+  summary(mFC)
+  rm(V1,V2,V3,V4)
+  saveRDS(mFC, "data/mFC.rds") # Save
+  #mFC <- readRDS("data/mFC.rds") # Load
+  
+  # Nordic:
+  V1 <- aggregate(FN, cut(index(FN), breaks="min"), mean, na.rm = TRUE) # Mean
+  V2 <- aggregate(FN, cut(index(FN), breaks="min"), my.max) # Max
+  V3 <- aggregate(FN, cut(index(FN), breaks="min"), my.min) # Min
+  V4 <- aggregate(FN, cut(index(FN), breaks="min"), sd, na.rm = TRUE) # Standard Deviation
+  mFN <- xts(x=cbind(coredata(V1),coredata(V2),coredata(V3),coredata(V4)),
+             order.by=as.POSIXct(index(V1),tz="Europe/Paris"))
+  colnames(mFN)<-c("mean", "max", "min","std.dev")
+  summary(mFN)
+  rm(V1,V2,V3,V4)
+  saveRDS(mFN, "data/mFN.rds") # Save
+  #mFN <- readRDS("data/mFN.rds") # Load
+  
+  rm(mFC,mFN)
+  
+  ##############################
+  ## Processed to 1 hour data ##
+  ##############################
+  # Continental:
+  V1 <- aggregate(FC, cut(index(FC), breaks="hour"), mean, na.rm = TRUE) # Mean, digress to zoo
+  V2 <- aggregate(FC, cut(index(FC), breaks="hour"), my.max) # Max
+  V3 <- aggregate(FC, cut(index(FC), breaks="hour"), my.min) # Min
+  V4 <- aggregate(FC, cut(index(FC), breaks="hour"), sd, na.rm = TRUE) # Standard Deviation
+  hFC <- xts(x=cbind(coredata(V1),coredata(V2),coredata(V3),coredata(V4)),
+             order.by=as.POSIXct(index(V1),tz="Europe/Paris"))
+  colnames(hFC)<-c("mean", "max", "min","std.dev")
+  summary(hFC)
+  rm(V1,V2,V3,V4)
+  saveRDS(hFC, "data/hFC.rds") # Save
+  #hFC <- readRDS("data/hFC.rds") # Load
+  
+  # Nordic:
+  V1 <- aggregate(FN, cut(index(FN), breaks="hour"), mean, na.rm = TRUE) # Mean
+  V2 <- aggregate(FN, cut(index(FN), breaks="hour"), my.max) # Max
+  V3 <- aggregate(FN, cut(index(FN), breaks="hour"), my.min) # Min
+  V4 <- aggregate(FN, cut(index(FN), breaks="hour"), sd, na.rm = TRUE) # Standard Deviation
+  hFN <- xts(x=cbind(coredata(V1),coredata(V2),coredata(V3),coredata(V4)),
+             order.by=as.POSIXct(index(V1),tz="Europe/Paris"))
+  colnames(hFN)<-c("mean", "max", "min","std.dev")
+  summary(hFN)
+  rm(V1,V2,V3,V4)
+  saveRDS(hFN, "data/hFN.rds") # Save
+  #hFN <- readRDS("data/hFN.rds") # Load
+  
+  rm(hFC,hFN)
+  
