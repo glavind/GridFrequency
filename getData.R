@@ -251,6 +251,41 @@ setwd("C:/Users/Glavind/git/GridFrequency")
   
   rm(mFC,mFN)
   
+  #############################
+  ## Processed to 5 min data ##
+  #############################
+  # Continental:
+  V1 <- period.apply(FC, endpoints(FC, "minutes", 5), mean, na.rm=T)
+  V2 <- period.apply(FC, endpoints(FC, "minutes", 5), my.max)
+  V3 <- period.apply(FC, endpoints(FC, "minutes", 5), my.min)
+  V4 <- period.apply(FC, endpoints(FC, "minutes", 5), sd, na.rm=T)
+  m5FC <- xts(x=cbind(coredata(V1),coredata(V2),coredata(V3),coredata(V4)),
+             order.by=as.POSIXct(index(V1),tz="Europe/Paris"))
+  
+  colnames(m5FC)<-c("mean", "max", "min","std.dev")
+  summary(m5FC)
+  index(m5FC)<- index(m5FC) - (60*4+50) #Subtract 00:04:50 to get start instead of end at index
+  rm(V1,V2,V3,V4)
+  saveRDS(m5FC, "data/m5FC.rds") # Save
+  #m5FC <- readRDS("data/m5FC.rds") # Load
+  
+  # Nordic:
+  V1 <- period.apply(FN, endpoints(FN, "minutes", 5), mean, na.rm=T)
+  V2 <- period.apply(FN, endpoints(FN, "minutes", 5), my.max)
+  V3 <- period.apply(FN, endpoints(FN, "minutes", 5), my.min)
+  V4 <- period.apply(FN, endpoints(FN, "minutes", 5), sd, na.rm=T)
+  m5FN <- xts(x=cbind(coredata(V1),coredata(V2),coredata(V3),coredata(V4)),
+             order.by=as.POSIXct(index(V1),tz="Europe/Paris"))
+  
+  colnames(m5FN)<-c("mean", "max", "min","std.dev")
+  index(m5FN)<- index(m5FN) - (60*4+59) #Subtract 00:04:59 to get start instead of end at index
+  summary(m5FN)
+  rm(V1,V2,V3,V4)
+  saveRDS(m5FN, "data/m5FN.rds") # Save
+  #m5FN <- readRDS("data/m5FN.rds") # Load
+  
+  rm(m5FC,m5FN)
+  
   ##############################
   ## Processed to 1 hour data ##
   ##############################
@@ -281,4 +316,5 @@ setwd("C:/Users/Glavind/git/GridFrequency")
   #hFN <- readRDS("data/hFN.rds") # Load
   
   rm(hFC,hFN)
-  
+  rm(my.max, my.min)
+  rm(FC, FN)
