@@ -42,14 +42,14 @@
 ### E) Determine number of minutes with min belov thresholds. Histogram of min.
 ### F) Level plot. To see patterns intraday and between month. Cut in weekday/sat/sun to check for transday effects if anything is found.
 
-## A) Missing observations
+### A) Missing observations ###
   # Continental:
     cat("Continental: missing", sum(is.na(FC[,1])), "observations (", sprintf("%.4f",sum(is.na(FC[,1]))/nrow(FC)*100),"%)")
   # Nordic:
     cat("Nordic: missing", sum(is.na(FN[,1])), "observations (", sprintf("%.4f",sum(is.na(FN[,1]))/nrow(FN)*100),"%)")
   
 
-## B) Plot hourly series
+### B) Plot hourly series ###
   #### Graph Settings #### 
     # From https://github.com/oscarperpinan/spacetime-vis
     xscale.components.custom <- function(...){
@@ -67,7 +67,7 @@
     defaultArgs <- lattice.options()$default.args
    
     ####
-    # Basically the ggplot2like() function with some alterations
+    # Basically the ggplot2like() theme function with some alterations
     myTheme <- trellis.par.get()
     myTheme <- modifyList(myTheme, list(axis.line = list(col = "black", lwd=1), 
                                       axis.text = list(cex = 0.8, lineheight = 0.9, col = "black"), 
@@ -146,7 +146,7 @@
     freqPlot
     dev.off()
 
-## C) Frequency drift
+### C) Frequency drift ###
     ## Continental
     dFC <- apply.daily(FC, mean, na.rm=T)
     index(dFC)<-as.Date(index(dFC))
@@ -182,7 +182,12 @@
       #scale_colour_discrete(name="Frequency series", breaks=c("FN","FC"), labels=c("Nordic","Continental")) + #Change labels
       theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) # Rotate x-axis
     g
-
+    
+    g1 <- g + stat_smooth(method = "lm", data=dat, aes(y=FN.cum.drift, color="Nordic")) +
+              stat_smooth(method = "lm", data=dat, aes(y=FC.cum.drift, color="Continent")) +
+              theme(legend.position="none", legend.key=element_blank())
+    g1
+    ## Frequency setpoint corrections:
     (49.990 - 50)*3600*24/50
     (50.010 - 50)*3600*24/50
     # https://www.swissgrid.ch/swissgrid/en/home/experts/topics/frequency.html
@@ -190,15 +195,16 @@
     
 ### D/E) Number of extreme events
   ## Create histogram
+    ## Continental
     dat <- coredata(mFC[,1])
     hist(dat, prob=TRUE, col="grey80", breaks = 60, main="hFC", prob=T)# prob=TRUE for probabilities not counts
     lines(density(dat, na.rm = T), col="midnightblue", lwd=2) 
     rug(dat) # Make a rug of observations underneath
     abline(v=49.90, lwd=2, col="red")
     abline(v=50.10, lwd=2, col="red")
-  ##
-  
-    #Nordic
+
+### B) Plot averages across day ###
+    ## Nordic
     dat <- mFN[,1]
     avFN <- aggregate(dat, by=format(index(dat), format = "%H:%M"), mean, na.rm=T)
     index(avFN)<- as.POSIXct(strptime(index(avFN),format="%H:%M"))
@@ -247,13 +253,14 @@
     ggsave("figs/FCFN_avgAcrossDay.pdf",g, height=4, width=12)
     
     # To display functions in package: ls(pos = "package:packagename") and search() to get correct string
+
 ### F) Level plots ####
     
     # General helper functions
     fiveMin <- function(x){as.numeric(format(x, '%M'))%/%5}
     week <- function(x)as.numeric(format(x, '%W')) # Week of the year as decimal number (00-53) using Monday as the first day of week 
     weekday <- function(x)as.numeric(format(x, '%u')) # 1-7, 1=monday
-    wday <- function(x){
+    wday <- function(x){ #Sunday=3, Saturday=2, Other=1
       day<-as.numeric(format(x, '%u')) # 1-7, 1=monday
       if(day==7) 3
       else if (day==6) 2
@@ -263,21 +270,15 @@
     hour <- function(x)as.numeric(format(x, '%H'))
     month <- function(x)as.numeric(format(x, '%m'))
     
-    
-    
     # Theme
     myTheme <- modifyList(custom.theme(region=brewer.pal(9, 'RdBu')),
-                          list(
-                            strip.background=list(col='gray'),
-                            panel.background=list(col='gray')))
-   
+                          list(strip.background=list(col='gray'),panel.background=list(col='gray')))
     
     # Plotting function
     lvlPlotMonth <- function(x){
-      dat<-x
-      maxZ <- max(abs(dat), na.rm = T)
+      maxZ <- max(abs(x), na.rm = T)
       
-      lvlplot<-levelplot(dat ~ hour(index(dat)) * fiveMin(index(dat)) | factor(month(index(dat))),
+      lvlplot<-levelplot(x ~ hour(index(x)) * fiveMin(index(x)) | factor(month(index(x))),
                         at=pretty(c(-maxZ, maxZ), n=8),
                         colorkey=list(height=0.3),
                         layout=c(1, 9), strip=FALSE, strip.left=TRUE,
@@ -287,10 +288,9 @@
     }
     
     lvlPlotWeekday <- function(x){
-      dat<-x
-      maxZ <- max(abs(dat), na.rm = T)
+      maxZ <- max(abs(x), na.rm = T)
       
-      lvlplot<-levelplot(dat ~ hour(index(dat)) * fiveMin(index(dat)) | factor(weekday(index(dat))),
+      lvlplot<-levelplot(x ~ hour(index(x)) * fiveMin(index(x)) | factor(weekday(index(x))),
                          at=pretty(c(-maxZ, maxZ), n=8),
                          colorkey=list(height=0.3),
                          layout=c(1, 9), strip=FALSE, strip.left=TRUE,
@@ -298,7 +298,7 @@
                          par.settings=myTheme)
       lvlplot
     }
-    
+## Levelplot with Month ##
   ## Continental ##
   # Mean
     dat <- m5FC[,1]-50
@@ -344,7 +344,7 @@
     lvlPlotMonth(dat)
     dev.off()
     
-  # Weekday
+## Levelplot with Weekday ##
     # Mean
     dat <- m5FN[,1]-50
     fileName <- "figs/FN_lvlMean-weekday.pdf"
