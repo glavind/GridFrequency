@@ -8,14 +8,14 @@ output: pdf_document
 
 1. Download data from an API and a Web server.
 2. Store and handle a large dataset ($`r format(365*24*60*60+1,scientific=FALSE,big.mark = ",")`$ observations per year).
-3. Handle timeseries data that cross daylight savings.
+3. Handle timeseries data that cross daylight saving.
 4. Create beautiful, informative graphs.
 5. Craft a piece of reproducable research.
-6. Make a shiny/rStudio presentation showing the results.
+6. Make a rStudio presentation showing the results.
 7. Answer research questions:
     + is the European power grid frequency exactly 50 Hz on average?
     + what differences in grid frequency quality can be observed between the Nordic and Continental electricity grids?
-    + how many occurences of extreme events occur?
+    + how many occurences of extreme events was there in the sample?
     
 
 # Introduction
@@ -23,45 +23,47 @@ output: pdf_document
 The European electricity grid consists of several distinct frequency areas. One frequency area is the Nordic grid which covers Norway, Finland, Sweden and Eastern Denmark. Another frequency area is the Continental grid which covers countries such as Germany, France, Spain, Portugal, Italy, Slovenia, Czech Republic, Switzerland, Slovkia, Poland, and all the way to the border of Turkey...
 
 To keep a power grid stable, it is necessary for the grid frequency to move within a narrow band around a predetermind value. 
-For the European grid the frequency has been fixed at a reference frequency of 50 Hz+-1mHz. Whenever the frequency moves below this level, Transmission System Operators have contracted grid connected market participants to supply power to the grid at seconds notice. Similarly, if the frequency moves above 50 Hz TSO's have contracted participants to withdraw power from the grid. 
+For the European grid the grid frequency has been fixed at a reference frequency of 50 Hz+-1mHz. Whenever the frequency moves below this level, Transmission System Operators have contracted grid connected market participants to supply power to the grid at seconds notice. Similarly, if the frequency moves above 50 Hz TSO's have contracted participants to withdraw power from the grid. 
+
 In the Continental grid extreme events are characterized by frequencies +- 100 mHz. Especially the low frequencies bound is critical because below -100 mHz all primary reserves have been exhausted and the grid cannot cope with additional loss off generation. Below -150 mHz there is a serious risk of power plants dropping out, because of the low frequency. 
 On the other hand, at +200 mHz solar panels are also at risk of dropping out potentially leading to volatile situations..
 
-It has been agreed to run the power system at exactly 50 Hz on average. Because accumulated short-term frequency deviations can move the average above 50 Hz on one day, it is necessary to correct the grid frequency by setting a lower reference frequency point on subsequent days. This should be observable as effects in the daily average frequency measurements.
+It has been agreed to run the power system at exactly 50 Hz on average, so that systems can keep track of the approximate time by measuring grid frequency. Because accumulated short-term frequency deviations can move the average above 50 Hz on one day it is necessary to correct the grid frequency by setting a lower reference frequency point on subsequent days. This should be observable as effects in the daily average frequency measurements.
 Because of this correction, it should be possible to set a watch by measuring the grid frequency (give or take about a minute). 
-We will test whether this correction does indeed occur.
+We will see whether this correction does indeed occur and if the clock drift on average is zero.
 
 # Getting the data
 
-This sections get nitty gritty on how to retrieve frequency data. For the continent it is rather easy, because the french tso RTE provides this data in nicely formatted csv-files. For the Nordic grid however, we have to retrieve data from an undocumented api at the Norwegian tso Statnett. This requires some probing and error correction in the code.
+This sections get nitty gritty on how to retrieve frequency data. For the continent it is straighforward, because the french tso RTE provides this data in nicely formatted csv-files. For the Nordic grid however, we have to retrieve the data from an undocumented api at the Norwegian tso Statnett. This requires some probing and error correction in the code.
 
-If data sources and data retrieval is not of interest, you may proceed to the actual analysis. We end up with two dataset for the first nine months of 2015. 
+If data sources and data retrieval is not of interest, you may proceed to the actual analysis. We end up with two dataset for the first nine months of 2015.
+
 For the Continental grid we have an observation for each 10 seconds leading to $`r format(as.double(difftime(as.POSIXct("2015-09-01"), as.POSIXct("2015-01-01"), units="sec"))/10,scientific=FALSE,big.mark = ",")`$ observations. 
 For the Nordic grid we have an observations each second leading to $`r format(as.double(difftime(as.POSIXct("2015-09-01"), as.POSIXct("2015-01-01"), units="sec")),scientific=FALSE,big.mark = ",")`$ observations.
 
-In the sample period there was a summer Daylight Savings Time (DST) change in Hour 3 on 2015-03-29, where the hour does not exist in local time. Similarly there will be a winter DST change in Hour 3 on 2015-10-25 (not included in sample), where there will be two hours.
+In the sample period there was a summer Daylight Savings Time (DST) change in Hour 3 on 2015-03-29, where the hour does not exist in local time. Similarly there will be a winter DST change in Hour 3 on 2015-10-25 (not included in sample) where there will be two Hour 3's.
 
 ### Nordic
 
-We can query the API of the [Norwegian TSO Statnett](http://www.statnett.no/en/Market-and-operations/) to get 1 second measurements ($`r format(365*24*60*60,scientific=FALSE,big.mark = ",")`$ observations per year).
+We query the API of the [Norwegian TSO Statnett](http://www.statnett.no/en/Market-and-operations/) to get 1 second measurements ($`r format(365*24*60*60,scientific=FALSE,big.mark = ",")`$ observations per year).
 
 The call to the API is http://driftsdata.statnett.no/restapi/Frequency/BySecond?FromInTicks=FromTimeInMs&ToInTicks=ToTimeInMs. This GET request returns 1 second measurements as well as startDate and EndDate of the request in Local timezone. The inputs are in ms since epoch and therefore UTC.
 
-Data retrieval is somewhat complicated by the fact that the return data do not have datetimes associated with each observation. This becomes a problem because there are missing observations, which are just excluded from the returned list. This happens for instance on 2015-01-07 15:33:00 to 15:34:00, where only 39 observations are returned. To get a complete dataset we are therefore forced to download an hour, check if it is complete. If not, get each minute and check if complete. If not, get each second and check if complete or finally NA.
-This process is time consuming (one GET request for one hour takes appr. 0.3-0.5 sec.), especially when we have to loop across each minute and second. To get a full year the approximate runtime is on the order of several hours.
+Data retrieval is somewhat complicated by the fact that the return data do not have datetimes associated with each observation. This becomes a problem because there are missing observations, which are just excluded from the returned list. This happens for instance on 2015-01-07 15:33:00 to 15:34:00, where only 39 observations are returned. To get a complete dataset we are therefore forced to download an hour, check if it is complete. If not, get each minute and check if complete. If not, get each second and check if complete and if not record NA.
+This process is time consuming (one GET request for one hour takes appr. 0.3-0.5 sec.), especially when we have to loop across each minute and second. To get a full year the approximate runtime is on the order of multiple hours.
 
-The current implementation sometimes result in duplicate observations being added to the data frame. I cannot figure out where duplication occurs, so for now duplicate values are just excluded afterwards using the unique() function. 
+The current implementation sometimes result in duplicate observations being added to the data frame. I have not figured out where duplication occurs, so for now duplicate values are just excluded afterwards using the unique() function. 
 
 The API can only return 1 hour of data (probably `r 60*60` observations). So,
 ```{r eval=F}
 fromDate <- ymd_hms("2015-10-19 07:00:00")
 toDate <- ymd_hms("2015-10-19 08:00:00")
 ```
-gives data from "2015-10-19 09:00:00" to "2015-10-19 09:59:59"
+returns data from "2015-10-19 09:00:00" to "2015-10-19 09:59:59"
 
 **API Examples**
 
-The following examples illustrates how Daylight Savings Time (DST) affects output.
+The following examples illustrate how Daylight Savings Time (DST) affects return values.
 
 Before DST:
 ```{r eval=F}
@@ -106,9 +108,210 @@ toDate <- dmy_hms("29-03-2015 02:00:00")
 
 We can query the Website of the [French TSO RTE](http://clients.rte-france.com/lang/an/clients_producteurs/vie/vie_frequence.jsp) to get 10 second measurements ($`r format(365*24*60*60/10,scientific=FALSE,big.mark = ",")`$ observations per year).
 
-The data returned is a zip file containing one csv file with 10 second measurements for one month in Hz. The format of the date is local time (Europe/Paris), with NA for hour 3 (02:00:00-02:59:50) in spring DST.
+The data is returned as a zip file containing one csv file with 10 second measurements for one month. The format of the date is local time (Europe/Paris), with NA for hour 3 (02:00:00-02:59:50) in spring DST.
 
 There are also a number of missing values in this data set.
 
 # Analysis
+
+## Initial data validation
+
+```{r, echo=FALSE, warning=F, message=F}
+#--- Description ---#
+# Load all necessary data
+#
+#--- Packages ---#
+  # Load packages and data
+  library(xts) # time series
+  library(lubridate) # convert date
+  library(pryr) # report file size
+  library(grid) # graph - lowlevel
+  library(latticeExtra) # graph
+  library(ggplot2)  # graph
+  library(reshape2) # transform
+  library(scales) # graph
+
+  setwd("C:/Users/Glavind/git/GridFrequency")
+
+#--- Data ---#
+  # Read raw 1/10 second data
+  FC <- readRDS("data/freq_continental_processed.rds") # XTS
+  FN <- readRDS("data/freq_nordic_processed.rds") # XTS
+  
+  ## Processed to 1 min data
+  mFC <- readRDS("data/mFC.rds") # XTS - mean, max, min, std.dev
+  mFN <- readRDS("data/mFN.rds") # XTS - mean, max, min, std.dev
+#   
+#   ## Processed to 5 min data
+#   m5FC <- readRDS("data/m5FC.rds") # XTS - mean, max, min, std.dev
+#   m5FN <- readRDS("data/m5FN.rds") # XTS - mean, max, min, std.dev
+#   
+#   ## Processed to 1 hour data
+   hFC <- readRDS("data/hFC.rds") # XTS - mean, max, min, std.dev
+   hFN <- readRDS("data/hFN.rds") # XTS - mean, max, min, std.dev
+```
+
+Firstly, we check the raw data for missing observations.
+````{r, echo=F}
+# Continental:
+    cat("Continental: missing", sum(is.na(FC[,1])), "observations (", sprintf("%.4f",sum(is.na(FC[,1]))/nrow(FC)*100),"%)")
+  # Nordic:
+    cat("Nordic: missing", sum(is.na(FN[,1])), "observations (", sprintf("%.4f",sum(is.na(FN[,1]))/nrow(FN)*100),"%)")
+```
+The relatively high amount of missing observations in the continental data stems from one whole april day missing.
+
+Secondly, we print a sample of the raw data. Here we see that even though the Nordic data is recorded at each second, changes only occur every 8-10 secs. This might indicate that the actual sampling is done every 8-10 seconds and not every second.
+
+````{r, echo=T, warning=F}
+# Continental:
+    head(FC,15)
+  # Nordic:
+    head(FN,15)
+```
+
+## Exploring the data
+
+To get an overviw, we first plot the average, maximum and minimum grid frequency for each hour of the test sample. From the two graphs it is evident that the Nordic grid shows significantly more extreme values of grid frequency.
+This might be because of the more frequent measurements in the Nordic grid data, but is also expected because smaller grids have less capacity to absord power imbalances.
+
+```{r echo=F, eval=T}
+#--- Description ---#
+# Plot frequency for nordic and continental grids.
+  
+#--- Settings ---#
+    # From https://github.com/oscarperpinan/spacetime-vis
+    xscale.components.custom <- function(...){
+      ans <- xscale.components.default(...)
+      ans$top=FALSE
+      ans}
+    yscale.components.custom <- function(...){
+      ans <- yscale.components.default(...)
+      ans$right=FALSE
+      ans}
+    myArgs <- list(as.table=TRUE,
+                   between=list(x=0.5, y=0.2),
+                   xscale.components = xscale.components.custom,
+                   yscale.components = yscale.components.custom)
+    defaultArgs <- lattice.options()$default.args
+    
+    # Basically the ggplot2like() function with some alterations
+    myTheme <- trellis.par.get()
+    myTheme <- modifyList(myTheme, list(axis.line = list(col = "black", lwd=1), 
+                                      axis.text = list(cex = 0.8, lineheight = 0.9, col = "black"), 
+                                      panel.background = list(col = "transparent"), 
+                                      reference.line = list(col = "white"), 
+                                      strip.background = list(col = "transparent"), 
+                                      strip.shingle = list(col = "transparent"), 
+                                      strip.border = list(col = "transparent"), 
+                                      add.text = list(cex = 1.1, font=2),
+                                      plot.symbol =  list(col = "black", pch = 19, cex = 0.6), 
+                                      plot.line = list(col = "black"), 
+                                      plot.polygon = list(col = "black", border = "transparent"), 
+                                      dot.line = list(col = "black"), 
+                                      dot.symbol = list(col = "black", pch = 19)))
+    lattice.options(default.theme = myTheme, default.args = modifyList(defaultArgs, myArgs))
+#--- Data ---#
+  dat<-hFC
+#--- Plot ---#
+    freqPlot <- xyplot(cbind(dat[,1:3],50),
+                        col=c("black","red","midnightblue", "black"), main="Continent",
+                        superpose=TRUE, strip=FALSE, xlab="",
+                        auto.key=list(space="bottom", text=c("mean","max","min","50Hz"), columns=4, title="", cex=0.8, cex.title=0),
+                        lwd=0.5, alpha=0.3, layout = c(1, 3),
+                        cut=list(n=3, overlap=0), between = list(x = 0.3, y = 1))
+                          
+  freqPlot
+
+#--- Data ---#
+  dat<-hFN
+#--- Plot ---#
+    freqPlot <- xyplot(cbind(dat[,1:3],50),
+                        col=c("black","red","midnightblue", "black"), main="Nordic",
+                        superpose=TRUE, strip=FALSE, xlab="",
+                        auto.key=list(space="bottom", text=c("mean","max","min","50Hz"), columns=4, title="", cex=0.8, cex.title=0),
+                        lwd=0.5, alpha=0.3, layout = c(1, 3),
+                        cut=list(n=3, overlap=0), between = list(x = 0.3, y = 1))
+                          
+  freqPlot
+```
+
+Next we create a plot of the average grid frequency across a day.
+
+```{r echo=F, eval=T}
+#--- Description ---#
+# Plot average frequency across the day for nordic and continental grids.
+  
+#--- Data ---#
+  ## Nordic  
+    avFN <- aggregate(mFN[,1], by=format(index(mFN[,1]), format = "%H:%M"), mean, na.rm=T)
+    index(avFN)<- as.POSIXct(strptime(index(avFN),format="%H:%M"))
+    colnames(avFN)<-c("freq")
+  ## Continental
+    avFC <- aggregate(mFC[,1], by=format(index(mFC[,1]), format = "%H:%M"), mean, na.rm=T)
+    index(avFC)<- as.POSIXct(strptime(index(avFC),format="%H:%M"))
+    colnames(avFC)<-c("freq")
+
+  ## Both
+    dat <- cbind(as.data.frame(cbind(avFN, avFC)), index(avFC))
+    names(dat)<-c("FN", "FC", "index")
+    dat.melt <- melt(dat, id.vars = "index") # Melt into long format
+
+#--- Plot ---#
+  ## Graph  
+  g <- ggplot(data=dat.melt, aes(x=index, y=value, col=variable)) + 
+    geom_line() + 
+    geom_line(y=50, col="black") +
+    ggtitle("Average Frequency") +
+    xlab("Time") + 
+    ylab("Frequency (Hz)") +
+    theme_bw() +
+    theme(legend.key = element_blank(), legend.position="bottom") +
+    scale_x_datetime(labels=date_format("%H:%M",tz="Europe/Paris"), expand=c(0,0),  breaks=date_breaks(width="1 hour"))  +
+    scale_colour_discrete(name="", breaks=c("FN","FC"), labels=c("Nordic","Continental")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) # Rotate x-axis
+  g
+```
+
+## Frequency drift
+```{r, echo=F, eval=T}
+#--- Description ---#
+# Plot accumulated frequency drift for nordic and continental grids
+#  
+#--- Data ---#
+  ## Continental
+  dFC <- apply.daily(FC, mean, na.rm=T)
+  index(dFC)<-as.Date(index(dFC))
+  dFC<-cbind(dFC,(dFC[,1]-50)*3600*24/50)
+  miss <- is.na(dFC)
+  dFC[miss] <- c(50,0)
+  dFC<-cbind(dFC,cumsum(dFC[,2]))
+  names(dFC)<-c("FC.frequency", "FC.drift", "FC.cum.drift")
+  
+  ## Nordic
+  dFN <- apply.daily(FN, mean, na.rm=T) # average across days
+  index(dFN)<-as.Date(index(dFN))
+  dFN<-cbind(dFN,(dFN[,1]-50)*3600*24/50) # cbind drift in seconds
+  miss <- is.na(dFN)
+  dFN[miss] <- c(50,0)
+  dFN<-cbind(dFN,cumsum(dFN[,2])) # cumm.drift
+  names(dFN)<-c("FN.frequency", "FN.drift", "FN.cum.drift")
+  
+  ## Both
+  dat<-fortify(cbind(dFN[,3],dFC[,3]))
+
+#--- Plot ---#
+  # Graph
+  g <- ggplot(data=dat, aes(x=Index)) +
+    geom_line(data=dat, aes(y=FN.cum.drift, color="Nordic")) +
+    geom_line(data=dat, aes(y=FC.cum.drift, color="Continent")) +
+    ggtitle("Cumulative drift") +
+    labs(color="") +
+    xlab("Time") + 
+    ylab("Seconds") +
+    theme_bw() +
+    theme(legend.key = element_blank(), legend.position="bottom") +
+    scale_x_date(labels=date_format("%b %y",tz="Europe/Paris"), expand=c(0,0), breaks=date_breaks(width="1 month"))  + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) # Rotate x-axis
+  g
+```
 

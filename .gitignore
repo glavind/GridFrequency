@@ -1,11 +1,10 @@
 # Ignore All
 *
+
 # Except
-!analysis.R
-!continental.rds
-!freq_nordic_dt_1-9.rds
-!getData.R
-!GridFreqencyAnalysis.Rmd
+!*analysis.R
+!*getData.R
+!*GridFreqencyAnalysis.Rmd
 
 # Windows image file caches
 Thumbs.db
