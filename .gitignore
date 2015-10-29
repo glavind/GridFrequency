@@ -1,10 +1,10 @@
 # Ignore All
-*
+/data
+/docs
+/figs
 
 # Except
-!*analysis.R
-!*getData.R
-!*GridFreqencyAnalysis.Rmd
+!somefile.suffix
 
 # Windows image file caches
 Thumbs.db
@@ -49,9 +49,6 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
-rmarkdown-reference-guide.pdf
-ggplot2-cheatsheet.pdf
-rmarkdown-cheatsheet.pdf
 
 data/
 # History files
