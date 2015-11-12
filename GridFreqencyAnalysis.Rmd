@@ -5,55 +5,63 @@ output: pdf_document
 linestretch: 1.2
 fontsize: 11pt
 ---
+In this short project, I use some of the techniques from the excellent Coursera [Data Science Specialization](https://www.coursera.org/specializations/jhudatascience?utm_medium=courseDescripTop) from John Hopkins to first download and then analyse two large datasets of the power grid frequency in EU.
+
+The R code to generate this PDF and to download data from the external sources can be found at my [GitHub repository](https://github.com/glavind).
+    
+The rest of this document is structured as follows: Section 1 contains an introduction to the research problem. In Section 2 a description of data sources and examples of API return values are provided. In section 3 we do a short graphical analysis of the data. This allows us to answer the research questions, and in Section 4 we conclude.
 
 # Research Objectives
 
 1. Download data from an API and a Web server using R.
-2. Store and handle a large dataset ($`r format(365*24*60*60+1,scientific=FALSE,big.mark = ",")`$ observations per year).
+2. Store and handle large datasets (up to $`r format(365*24*60*60+1,scientific=FALSE,big.mark = ",")`$ observations per year).
 3. Handle timeseries data that cross daylight saving.
-4. Create beautiful, informative graphs using both ggplot2 and lattice.
-5. Craft a piece of reproducable research.
+4. Create beautiful, informative graphs using both the ggplot2 and Lattice packages.
+5. Generate this document in R using Knitr/Markdown.
 6. Answer research questions:
     + What differences in grid frequency quality can be observed between the Nordic and Continental electricity grids?
-    + Is the European power grid frequency exactly 50 Hz on average?
+    + Is the European grid frequency exactly 50 Hz on average?
     
-    
-# Introduction
+# 1 Introduction
 
-The European electricity grid consists of several distinct frequency areas. One frequency area is the Nordic grid which covers Norway, Finland, Sweden and Eastern Denmark. Another frequency area is the Continental grid which covers countries such as Germany, France, Spain, Portugal, Italy, Slovenia, Czech Republic, Switzerland, Slovkia, Poland, and all the way to the border of Turkey...
+The European electricity grid consists of several distinct frequency areas. One of these frequency areas is the smaller Nordic grid, which covers Norway, Finland, Sweden, and Eastern Denmark. Another of these frequency areas is the larger Continental grid, which covers countries such as Germany, France, Spain, Portugal, Italy, Slovenia, Czech Republic, Switzerland, Slovakia, Poland, etc. This analysis will focus on comparing these two frequency areas.
 
-To keep a power grid stable, it is necessary for the grid frequency to move within a narrow band around a predetermined value. 
-For the European grid the setpoint has been fixed at a reference frequency of 50 Hz+-1mHz. Whenever the frequency moves below this level, Transmission System Operators have contracted grid connected market participants to supply power to the grid at seconds notice. Similarly, if the frequency moves above 50 Hz TSO's have contracted participants to withdraw power from the grid.
+To keep a power grid stable it is necessary for the grid frequency to move within a narrow band around a pre-determined frequency setpoint. 
+For the European grid the setpoint has been fixed at a reference frequency of 50 Hz+-1mHz. Whenever the frequency moves below this level, Transmission System Operators have contracted grid connected market participants to supply power to the grid at seconds notice. Similarly, if the frequency moves above 50 Hz TSOs have contracted participants to withdraw power from the grid.
 
-In the Continental grid extreme events are characterized by frequencies +- 100 mHz. Especially the low frequencies bound is critical because below -100 mHz all primary reserves have been exhausted and the grid has to cope with additional loss off generation. Below -150 mHz there is a real risk of power plants dropping out, because of the low frequency. 
-On the other end, at +200 mHz solar panels are at risk of dropping out to protect their electronics.
+In the Continental grid extreme events are characterized by frequencies +- 100 mHz. Especially the low frequency bound is critical because below -100 mHz all primary reserves have been exhausted and the grid has to cope with additional loss off generation without backup supply. Below -150 mHz there is a real risk of power plants dropping out, because of the low frequency. 
+But an extreme positive frequency, can also become problematic for grid-connected entities. For example, at +200 mHz solar panels are at risk of dropping out to protect their electronics, leading to a disruption in supply.
 
-In Europe it has also been agreed to run the power system at exactly 50 Hz on average, so that systems can keep track of the approximate time by continuously measuring the frequency. This way the systems know that 50 fluctuations in the grid equal 1 second in realworld time.  
-But, because accumulated frequency deviations can move the average above 50 Hz on one day it is sometimes necessary to correct the grid frequency by setting a lower reference frequency point on subsequent days. In practice this is done by fixing the frequency setpoint at 49.99 Hz for 24 hours if the grid time is ahead of clock time and at 50.01 Hz if the grid time is behind clock time. When this correction is performed, the correction equals `r (50.010 - 50)*3600*24/50` seconds/day.
+Because of these issues, the grid frequency is tightly controlled by TSOs and any deviation is generally promptly dealt with.
 
-The time correction should be observable in frequency measurements, as a frequency correction in the daily average frequency measurement, whenever the grid time deviates significantly from clock time. We should also observe that the long-run average deviation from 50Hz is zero.
+In Europe it has furthermore been agreed to run the power system at exactly 50 Hz on average, so that systems can keep track of the approximate time by counting measuring the grid frequency. This way systems know that 50 fluctuations in the grid equal 1 second in realworld time.  
+But, because accumulated deviation can move away from the zero due to persistent grid frequency deviations, it is sometimes necessary to correct the grid frequency by setting a lower reference frequency point on subsequent days. In practice this is done by fixing the frequency setpoint at 49.99 Hz for 24 hours if the grid time is ahead of clock time and at 50.01 Hz if the grid time is behind clock time. When this correction is performed, the correction to the grid-time is `r (50.010 - 50)*3600*24/50` seconds/day.
 
-# Getting the data
+The time correction should be observable in the daily average frequency, whenever the grid time deviates significantly from clock time, leading to autoregressive effects. We should also observe that the long-run average deviation from 50Hz is zero.
 
-This sections gets nitty gritty on how to retrieve frequency data. For the Continental grid it is straighforward, because the French Transmission System Operator (TSO) RTE provides this data in nicely formatted csv-files. For the Nordic grid however, we have to retrieve the data from an undocumented api at the Norwegian TSO Statnett. This requires some probing and error correction in the code.
+# 2 Getting the data
 
-If data sources and data retrieval is not of interest, you may proceed to the actual analysis. We end up with two dataset for the first nine months of 2015.
+This sections gets nitty gritty on how to retrieve frequency data. For the Continental grid this is straighforward, because the French Transmission System Operator (TSO) RTE provides this data in nicely formatted csv-files. For the Nordic grid however, we have to retrieve the data from an undocumented api at the Norwegian TSO Statnett. This requires some probing and error correction in the code.
+
+If data sources and data retrieval is not of interest, you may proceed to the analysis. We end up with two dataset for the first nine months of 2015.
 
 For the Continental grid we have an observation for each 10 seconds leading to $`r format(as.double(difftime(as.POSIXct("2015-09-01"), as.POSIXct("2015-01-01"), units="sec"))/10,scientific=FALSE,big.mark = ",")`$ observations. 
 For the Nordic grid we have an observation each second leading to $`r format(as.double(difftime(as.POSIXct("2015-09-01"), as.POSIXct("2015-01-01"), units="sec")),scientific=FALSE,big.mark = ",")`$ observations.
 
-In the sample period there was a summer Daylight Savings Time (DST) change in Hour 3 on 2015-03-29 where the hour does not exist in local time. Similarly there will be a winter DST change in Hour 3 on 2015-10-25 (not included in sample) where there will be two Hour 3's.
+In the sample period there was a summer Daylight Savings Time (DST) change in Hour 3 on 2015-03-29, where the hour does not exist in local time. Similarly there will be a winter DST change in Hour 3 on 2015-10-25 (not included in sample), where there will be two Hour 3's.
 
-### Nordic
+The code to download from both sources can be found in "/code/getData.R".
+
+### 2.1 Nordic
 
 We query the API of the [Norwegian TSO Statnett](http://www.statnett.no/en/Market-and-operations/) to get 1 second measurements ($`r format(365*24*60*60,scientific=FALSE,big.mark = ",")`$ observations per year).
 
 The call to the API is http://driftsdata.statnett.no/restapi/Frequency/BySecond?FromInTicks=FromTimeInMs&ToInTicks=ToTimeInMs. This GET request returns 1 second measurements as well as startDate and EndDate of the request in Local timezone. The inputs are in ms since epoch and therefore UTC.
 
-Data retrieval is somewhat complicated by the fact that the return data do not have datetimes associated with each observation. This becomes a problem because there are missing observations, which are just excluded from the returned list. This happens for instance on 2015-01-07 15:33:00 to 15:34:00, where only 39 observations are returned. To get a complete dataset we are therefore forced to download an hour, check if it is complete. If not, get each minute and check if complete. If not, get each second and check if complete and if not record NA.
+Data retrieval is somewhat complicated by the fact that the return data do not have datetimes associated with each observation. This becomes a problem because there are missing observations, which are just excluded from the returned list. This happens for instance on 2015-01-07 15:33:00 to 15:34:00, where only 39 observations are returned. To get a complete dataset, we are therefore forced to download an hour, check if it is complete. If not, get each minute and check if complete. If not, get each second and check if complete and if not record a missing observation.
 This process is time consuming (one GET request for one hour takes appr. 0.3-0.5 sec.), especially when we have to loop across each minute and second. To get a full year the approximate runtime is on the order of multiple hours.
 
-The current implementation sometimes result in duplicate observations being added to the data frame. I have not figured out where duplication occurs, so for now duplicate values are just excluded afterwards using the unique() function. 
+The current implementation sometimes result in duplicate observations being added to the data frame. I have not prioritized finding the place where duplication occurs, so for now duplicate values are just excluded afterwards using the unique() function. 
 
 The API can only return 1 hour of data (probably `r 60*60` observations). So,
 ```{r eval=F}
@@ -105,7 +113,7 @@ toDate <- dmy_hms("29-03-2015 02:00:00")
 > "2015-03-29 03:59:59"
 
 
-### Continental
+### 2.2 Continental
 
 We can query the Website of the [French TSO RTE](http://clients.rte-france.com/lang/an/clients_producteurs/vie/vie_frequence.jsp) to get 10 second measurements ($`r format(365*24*60*60/10,scientific=FALSE,big.mark = ",")`$ observations per year).
 
@@ -113,9 +121,9 @@ The data is returned as a zip file containing one csv file with 10 second measur
 
 There are also a number of missing values in this data set.
 
-# Analysis
+# 3 Analysis
 
-## Initial data validation
+## 3.1 Initial data validation
 
 <!-- Load all necessary data -->
 ```{r, echo=FALSE, warning=F, message=F}
@@ -174,10 +182,10 @@ Secondly, we print a sample of the raw data. Here we see that even though the No
   head(FN,15)
 ```
 
-## Exploring the data
+## 3.2 Exploring the data
 
-To get an initial understanding of the data, we plot the average, maximum, and minimum grid frequency for each hour in the test sample. 
-From the two graphs it is evident that the Nordic grid frequency shows significantly more extreme values than the Continental grid and has a larger variation within hours. This might be because of the more frequent grid measurements in the raw Nordic data, but is also the expected result as a smaller grid, such as the Nordic, has less capacity to absord power imbalances and therefore could show larger frequency variations.
+To get an initial understanding of the data, we plot the average, maximum, and minimum grid frequency for each hour in the sample. 
+From the two graphs it is evident that the Nordic grid frequency shows significantly more extreme values than the Continental grid and has a larger variation within hours. This might be because of the more frequent grid measurements in the raw Nordic data, but is also the expected result as a smaller grid, such as the Nordic, has less capacity to absord power imbalances and therefore likely show larger frequency variations.
 
 <!-- 
 # Plot 1: Hourly average, max, and min frequency for nordic and continental grids.
@@ -265,9 +273,9 @@ From the two graphs it is evident that the Nordic grid frequency shows significa
 
 Next, we create a plot of the average grid frequency across the day.  
 Here we observe clear trends in the grid frequency with notable spikes around the changes in hour.  
-This is likely a market design artifact that materializes because trading and interchange scheduling between countries is typically done in hourly intervals (though during the last 5 years quarterly periods has also begun trading with some volume internally in Germany). So when the power flows change around the hour a mismatch in timing can affect the grid frequency.  
+This is likely a market design artifact that materializes because trading and power exchange scheduling between countries is typically done in hourly intervals (though during the last 5 years quarterly periods has also begun trading with some volume internally in Germany). So when the power flows change around the hour a mismatch the timing of changes in generation and consumption can affect the grid frequency.  
 
-The largest variation for the Continent is seen around evening/night when generation has to adapt to a falling consumption and in the morning where consumption pick up and generations has to follow. For the Nordic system, we largely see the same pattern.
+The largest variation for the Continent is seen around evening/night when generation has to adapt to a falling consumption and in the morning where consumption picks up and generation has to follow. For the Nordic system, we largely see the same pattern.
 
 <!-- Plot average frequency across the day for nordic and continental grids -->
 ```{r echo=F, eval=T}
@@ -305,13 +313,13 @@ The largest variation for the Continent is seen around evening/night when genera
   g
 ```
 
-## Frequency drift
+## 3.3 Frequency drift
 Last, we plot the clock drift in the two grids. This is the amount of seconds that a grid-run clock would deviate from an atomic clock during the period. We see that, contrary to the previous statements, the clock drift is not zero. In the Continental grid the clock would run around 140 seconds faster on 1. Oktober compared to the atomic clock, while the Nordic clock would run around 225 seconds slower.
 
 On the homepage of [Swissgrid](https://www.swissgrid.ch/swissgrid/en/home/experts/topics/frequency.html) we can see the current clock drift for the Continental grid (which is nowhere near as much off). This suggests that our data lacks the true precision needed to run an accurate grid clock.  
-This could either be due to the observations being point measurements of grid frequency (instead of providing the average over the last 1/10 seconds), it could be a small lack of precision in each measurement that adds up, or it could be due to shifts during the periods with missing data (the frequency during missing periods is assumed to be 50Hz exactly so there is no change in clock drift).
+This could either be due to the observations being point measurements of grid frequency (instead of providing the average over the last 1/10 seconds), it could be a small lack of precision in each measurement that adds up, or it could be due to shifts during the periods with missing data (the frequency during missing periods is assumed to be 50Hz exactly so there no change in clock drift is induced during missing periods).
 
-Nonetheless, we do see clear reversals in the grid frequency. Fitting a straight line to the data points (to account for a constant drift in the series) we observe what looks like a reversal to this trend line.
+Nonetheless, we do see clear reversals in the grid frequency. Fitting a straight line to the data points (to account for a constant drift in the series) we observe what looks like systematic reversals to this trend line.
 
 <!-- Plot accumulated frequency drift for nordic and continental grids -->
 ```{r, echo=F, eval=T}
@@ -363,14 +371,13 @@ Nonetheless, we do see clear reversals in the grid frequency. Fitting a straight
   g1
 ```
 
-# Conclusion
-In this short project, we have shown how to download frequency measurements at a 1/10 second resolution from the webpage of two European Transmission System Operators. The resulting data were then validated, cleaned, and put in a structured format. Then we used two of R's graph packages to produce a couple of informative graphs which reveal the following insights: 
+# 4 Conclusion
+In this short project, we have shown how to download frequency measurements at a 1/10 second resolution from the webpage of two European Transmission System Operators. The resulting data were then validated, cleaned, and put in a structured format. Then we used two of R's graphing packages to produce a couple of informative graphs which reveal the following insights: 
 
 * The Continental grid has a more stable frequency than the Nordic grid. 
 * The frequency quality is most strained around the change in hour and during ramping of production.
-* The public data from the TSO's is not precise enough to serve as a grid clock (which should be possible for a frequency controlled clock that is directly connected to the grid), but we do observe reversals in the grid frequency which is consistent with an active frequency management aimed at keeping the long-run average frequency at 50 Hz.
+* The public data from the TSO's are not precise enough to serve as a grid clock (which should be possible for a proper frequency controlled clock that is directly connected to the grid), but we do observe reversals in the grid frequency which is consistent with an active frequency management aimed at keeping the long-run average frequency at 50 Hz.
 
 # Future Research / Links
-For more information on grid frequency check [ENTSOE](http://networkcodes.entsoe.eu/operational-codes/load-frequency-control-reserves/).  
-In the "Network Code on Load-Frequency Control and Reserves" some commonly agreed measures of frequency quality are presented. It would be interesting to use these quality measures on the downloaded grid data to assert the formal frequency quality in the Continental and Nordic grids.
-
+For more information on the management of grid frequency check [ENTSOE](http://networkcodes.entsoe.eu/operational-codes/load-frequency-control-reserves/).  
+In the "Network Code on Load-Frequency Control and Reserves" some commonly agreed measures of frequency quality are presented. It would be interesting to apply these quality measures on the downloaded grid data to more formally assert the quality of the grid frequency in the Continental and Nordic grids.
